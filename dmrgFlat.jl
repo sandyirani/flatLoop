@@ -138,38 +138,34 @@ for swp = 0:10
     AA = reshape(gr,dleft,2,2,2,2,dright)
     (A[i],A[i+1],trunc) = dosvd6(AA,m,toright)
     @show trunc
-    if toright
-      if i < n-1
-        if 1 < i
-          (i1,i2,i3,i4) = size(A[i])
-          Ai2 = reshape(A[i],i1*i2*i3,i4)
-          @tensor begin
-            hlri[b,bp] := HL[a,ap] * Ai2[a,b] * Ai2[ap,bp]
-          end
-        elseif i == 1
-          Ai = A[i]
-          @tensor begin
-            hlri[c,cp] := Htwosite[a,b,ap,bp] * Ai[e,a,b,c] * Ai[e,ap,bp,cp]
-          end
-        end
-        HLR[i] = hlri
-      end
-    else
+    if toright && i < n-1
       if 1 < i
-        if i < n-1
-          (i1,i2,i3,i4) = size(A[i+1])
-          Ai12 = reshape(A[i+1],i1,i2*i3*i4)
-          @tensor begin
-            hlri1[a,ap] := HR[b,bp] * Ai12[a,b] * Ai12[ap,bp]
-          end
-        elseif i == n-1
-          Aip1 = A[i+1]
-          @tensor begin
-            hlri1[e,ep] := Htwosite[a,b,ap,bp] * Aip1[e,a,b,c] * Aip1[ep,ap,bp,c]
-          end
+        (i1,i2,i3,i4) = size(A[i])
+        Ai2 = reshape(A[i],i1*i2*i3,i4)
+        @tensor begin
+          hlri[b,bp] := HL[a,ap] * Ai2[a,b] * Ai2[ap,bp]
         end
-        HLR[i+1] = hlri1
+      elseif i == 1
+        Ai = A[i]
+        @tensor begin
+          hlri[c,cp] := Htwosite[a,b,ap,bp] * Ai[e,a,b,c] * Ai[e,ap,bp,cp]
+        end
       end
+      HLR[i] = hlri
+    elseif !toright && 1 < i
+      if i < n-1
+        (i1,i2,i3,i4) = size(A[i+1])
+        Ai12 = reshape(A[i+1],i1,i2*i3*i4)
+        @tensor begin
+          hlri1[a,ap] := HR[b,bp] * Ai12[a,b] * Ai12[ap,bp]
+        end
+      elseif i == n-1
+        Aip1 = A[i+1]
+        @tensor begin
+          hlri1[e,ep] := Htwosite[a,b,ap,bp] * Aip1[e,a,b,c] * Aip1[ep,ap,bp,c]
+        end
+      end
+      HLR[i+1] = hlri1
     end
   end
 end
