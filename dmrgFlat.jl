@@ -21,7 +21,7 @@ end
 
 function dosvd6(AA,m,toright)	# AA is ia * 2 * 2 * ib;  svd down the middle;  return two parts
   ia = size(AA,1)
-  ib = size(AA,4)
+  ib = size(AA,6)
   AA = reshape(AA,ia*4,4*ib)
   (U,V,trunc) = dosvdleftright(AA,m,toright)
   mm = size(U,2)
@@ -59,9 +59,10 @@ for i=1:n
 end
 
 HLR = [zeros(1,1) for i=1:n]	# Initialize to avoid errors on firs sweep
-m = 3
+ms = 3
 for swp = 0:10
-  m = round(Int64,1.3*m)
+  ms = round(Int64,1.3*ms)
+  m = ms*ms
   for ii=-n+1:n-1		# if negative, going right to left
     ii == 0 && continue
     i = abs(ii)
@@ -71,7 +72,7 @@ for swp = 0:10
 
     dleft = size(A[i],1)
     alpha = dleft * 4
-    dright = size(A[i+1],3)
+    dright = size(A[i+1],4)
     beta = 4 * dright
     onesite = eye(4)
 
@@ -80,26 +81,24 @@ for swp = 0:10
     if i > 1
       Aim1 = A[i-1]
       @tensor begin
-        HL[a,sit,sib,ap,sitp,sibp] := Htwosite[sim1t,sit,sim1tp,sitp] * Htwosite[sim1b,sib,sim1bp,sibp]
-                                    * Aim1[b,sim1t,sim1b,a] * Aim1[b,sim1tp,sim1bp,ap]
+        HL[a,sit,sib,ap,sitp,sibp] := Htwosite[sim1t,sit,sim1tp,sitp] * Htwosite[sim1b,sib,sim1bp,sibp] * Aim1[b,sim1t,sim1b,a] * Aim1[b,sim1tp,sim1bp,ap]
       end
     end
     HL = reshape(HL,alpha,alpha)
-    i > 1 && HL += JK(HLR[i-1],onesite)
+    i > 1 && (HL += JK(HLR[i-1],onesite))
     if i < n-1
       Ai2 = A[i+2]
       @tensor begin
-        HR[a,sit,sib,ap,sitp,sibp] := Htwosite[si1t,si2t,si1tp,si2tp] * Htwosite[si1b,si2b,si1bp,si2bp]
-                                    * Ai2[b,si2t,si2b,a] * Ai2[bp,si2pt,si2pb,a]
+        HR[b,si1t,si1b,bp,si1tp,si1bp] := Htwosite[si1t,si2t,si1tp,si2tp] * Htwosite[si1b,si2b,si1bp,si2bp] * Ai2[b,si2t,si2b,a] * Ai2[bp,si2tp,si2bp,a]
       end
     end
     HR = reshape(HR,beta,beta)
-    i < n-1 && (HR += JK(onesite,HLR[i+2]) )
+    i < n-1 && (HR += JK(onesite,HLR[i+2]))
 
     OleftT =  Any[JK(JK(eye(dleft),sz),eye(2)), 0.5*JK(JK(eye(dleft),sp),eye(2)), 0.5*JK(JK(eye(dleft),sm),eye(2))]
     OrightT = Any[JK(sz,eye(2*dright)),JK(sm,eye(2*dright)),JK(sp,eye(2*dright))]
 
-    OleftB =  Any[JK(eye(dleft*2),sz), 0.5*JK(eye(dleft*2),sp), 0.5*JK(eye(dleft*2),sm))]
+    OleftB =  Any[JK(eye(dleft*2),sz), 0.5*JK(eye(dleft*2),sp), 0.5*JK(eye(dleft*2),sm)]
     OrightB = Any[JK(eye(2),JK(sz,eye(dright))),JK(eye(2),JK(sm,eye(dright))),JK(eye(2),JK(sp,eye(dright)))]
 
     Ai = A[i]
@@ -110,10 +109,11 @@ for swp = 0:10
 
     #  Inefficient implementation:  m^4   Ham construction
     Ham = zeros(alpha*beta,alpha*beta)
-    for j=1:length(Oleft)
+    for j=1:length(OleftT)
       Ham += JK(reshape(OleftT[j],alpha,alpha),reshape(OrightT[j],beta,beta))
       Ham += JK(reshape(OleftB[j],alpha,alpha),reshape(OrightB[j],beta,beta))
     end
+
     if i > 1
       Ham += JK(HL,eye(beta))
     end
@@ -121,11 +121,13 @@ for swp = 0:10
       Ham += JK(eye(alpha),HR)
     end
     if i == 1
-      Ham += JK(JK(eye(delft),Htwosite),eye(beta))
+      Ham += JK(JK(eye(dleft),reshape(Htwosite,4,4)),eye(beta))
     end
     if i == n-1
-      Ham += JK(eye(alpha),JK(Htwosite,eye*dirght))
+      Ham += JK(eye(alpha),JK(reshape(Htwosite,4,4),eye(dright)))
     end
+
+
     bigH = reshape(Ham,alpha*beta,alpha*beta)
     bigH = 0.5 * (bigH + bigH')
     evn = eigs(bigH;nev=1, which=:SR,ritzvec=true,v0=reshape(AA,alpha*beta))
@@ -134,34 +136,37 @@ for swp = 0:10
     gr = evn[2][:,1]
 
     AA = reshape(gr,dleft,2,2,2,2,dright)
-
     (A[i],A[i+1],trunc) = dosvd6(AA,m,toright)
     @show trunc
     if toright
       if i < n-1
         if 1 < i
-          (i1,i2,i3) = size(A[i])
-          Ai2 = reshape(A[i],i1*i2,i3)
+          (i1,i2,i3,i4) = size(A[i])
+          Ai2 = reshape(A[i],i1*i2*i3,i4)
           @tensor begin
             hlri[b,bp] := HL[a,ap] * Ai2[a,b] * Ai2[ap,bp]
           end
         elseif i == 1
           Ai = A[i]
-          hlri[c,cp] := Htwosite[a,b,ap,bp] * Ai[e,a,b,c] * Ai[e,ap,bp,cp]
+          @tensor begin
+            hlri[c,cp] := Htwosite[a,b,ap,bp] * Ai[e,a,b,c] * Ai[e,ap,bp,cp]
+          end
         end
         HLR[i] = hlri
       end
     else
       if 1 < i
         if i < n-1
-          (i1,i2,i3) = size(A[i+1])
-          Ai12 = reshape(A[i+1],i1,i2*i3)
+          (i1,i2,i3,i4) = size(A[i+1])
+          Ai12 = reshape(A[i+1],i1,i2*i3*i4)
           @tensor begin
             hlri1[a,ap] := HR[b,bp] * Ai12[a,b] * Ai12[ap,bp]
           end
         elseif i == n-1
           Aip1 = A[i+1]
-          hlri[e,ep] := Htwosite[a,b,ap,bp] * Aip1[e,a,b,c] * Aip1[ep,ap,bp,c]
+          @tensor begin
+            hlri1[e,ep] := Htwosite[a,b,ap,bp] * Aip1[e,a,b,c] * Aip1[ep,ap,bp,c]
+          end
         end
         HLR[i+1] = hlri1
       end
