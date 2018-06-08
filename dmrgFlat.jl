@@ -60,7 +60,7 @@ end
 
 HLR = [zeros(1,1) for i=1:n]	# Initialize to avoid errors on firs sweep
 ms = 3
-for swp = 0:10
+for swp = 0:1
   ms = round(Int64,1.3*ms)
   m = ms*ms
   for ii=-n+1:n-1		# if negative, going right to left
