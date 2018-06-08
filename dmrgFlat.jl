@@ -113,6 +113,7 @@ for swp = 0:1
       Ham += JK(reshape(OleftB[j],alpha,alpha),reshape(OrightB[j],beta,beta))
     end
 
+
     if i > 1
       Ham += JK(HL,eye(beta))
     end
@@ -127,12 +128,44 @@ for swp = 0:1
     end
 
 
+
     bigH = reshape(Ham,alpha*beta,alpha*beta)
     bigH = 0.5 * (bigH + bigH')
     evn = eigs(bigH;nev=1, which=:SR,ritzvec=true,v0=reshape(AA,alpha*beta))
     @show evn[1]
     @show size(evn[2])
     gr = evn[2][:,1]
+
+    #test
+    Ham = zeros(alpha*beta,alpha*beta)
+      if i < n-1
+        Ham += JK(eye(alpha),HR)
+      end
+      if i == n-1
+        Ham += JK(eye(alpha),JK(reshape(Htwosite,4,4),eye(dright)))
+      end
+    rightE = gr'*Ham*gr
+    println("Right Energy = $rightE")
+
+    #test
+    Ham = zeros(alpha*beta,alpha*beta)
+      if i > 1
+        Ham += JK(HL,eye(beta))
+      end
+      if i == 1
+        Ham += JK(JK(eye(dleft),reshape(Htwosite,4,4)),eye(beta))
+      end
+    leftE = gr'*Ham*gr
+    println("Left Energy = $leftE")
+
+    #test
+    Ham = zeros(alpha*beta,alpha*beta)
+    for j=1:length(OleftT)
+      Ham += JK(reshape(OleftT[j],alpha,alpha),reshape(OrightT[j],beta,beta))
+      Ham += JK(reshape(OleftB[j],alpha,alpha),reshape(OrightB[j],beta,beta))
+    end
+    centerE = gr'*Ham*gr
+    println("Center Energy = $centerE")
 
     AA = reshape(gr,dleft,2,2,2,2,dright)
     (A[i],A[i+1],trunc) = dosvd6(AA,m,toright)
