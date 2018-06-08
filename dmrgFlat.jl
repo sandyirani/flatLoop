@@ -74,10 +74,9 @@ for swp = 0:10
     alpha = dleft * 4
     dright = size(A[i+1],4)
     beta = 4 * dright
-    onesite = eye(4)
 
-    HL = zeros(dleft,4,dleft,4)
-    HR = zeros(4,dright,4,dright)
+    HL = zeros(dleft,2,2,dleft,2,2)
+    HR = zeros(2,2,dright,2,2,dright)
     if i > 1
       Aim1 = A[i-1]
       @tensor begin
@@ -85,15 +84,15 @@ for swp = 0:10
       end
     end
     HL = reshape(HL,alpha,alpha)
-    i > 1 && (HL += JK(HLR[i-1],onesite))
+    i > 1 && (HL += JK(HLR[i-1],eye(4)))
     if i < n-1
       Ai2 = A[i+2]
       @tensor begin
-        HR[b,si1t,si1b,bp,si1tp,si1bp] := Htwosite[si1t,si2t,si1tp,si2tp] * Htwosite[si1b,si2b,si1bp,si2bp] * Ai2[b,si2t,si2b,a] * Ai2[bp,si2tp,si2bp,a]
+        HR[si1t,si1b,b,si1tp,si1bp,bp] := Htwosite[si1t,si2t,si1tp,si2tp] * Htwosite[si1b,si2b,si1bp,si2bp] * Ai2[b,si2t,si2b,a] * Ai2[bp,si2tp,si2bp,a]
       end
     end
     HR = reshape(HR,beta,beta)
-    i < n-1 && (HR += JK(onesite,HLR[i+2]))
+    i < n-1 && (HR += JK(eye(4),HLR[i+2]))
 
     OleftT =  Any[JK(JK(eye(dleft),sz),eye(2)), 0.5*JK(JK(eye(dleft),sp),eye(2)), 0.5*JK(JK(eye(dleft),sm),eye(2))]
     OrightT = Any[JK(sz,eye(2*dright)),JK(sm,eye(2*dright)),JK(sp,eye(2*dright))]
