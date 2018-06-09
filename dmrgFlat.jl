@@ -75,7 +75,7 @@ for swp = 0:1
     dright = size(A[i+1],4)
     beta = 4 * dright
 
-    HL = zeros(dleft,2,2,dleft,2,2)
+    HL = zeros(alpha,alpha)
     HR = zeros(2,2,dright,2,2,dright)
     if i > 1
       Aim1 = A[i-1]
@@ -92,6 +92,8 @@ for swp = 0:1
       end
     end
     HR = reshape(HR,beta,beta)
+    #test
+    OldMid = JK(eye(alpha),HR)
     i < n-1 && (HR += JK(eye(4),HLR[i+2]))
 
     OleftT =  Any[JK(JK(eye(dleft),sz),eye(2)), 0.5*JK(JK(eye(dleft),sp),eye(2)), 0.5*JK(JK(eye(dleft),sm),eye(2))]
@@ -106,25 +108,37 @@ for swp = 0:1
       AA[a,bt,bb,dt,db,e] := Ai[a,bt,bb,c] * Ai1[c,dt,db,e]
     end
 
+    #test
+    LeftHam = zeros(alpha*beta,alpha*beta)
+    RightHam = zeros(alpha*beta,alpha*beta)
+    MidHam = zeros(alpha*beta,alpha*beta)
+    EndHam = zeros(alpha*beta,alpha*beta)
+
     #  Inefficient implementation:  m^4   Ham construction
     Ham = zeros(alpha*beta,alpha*beta)
     for j=1:length(OleftT)
       Ham += JK(reshape(OleftT[j],alpha,alpha),reshape(OrightT[j],beta,beta))
       Ham += JK(reshape(OleftB[j],alpha,alpha),reshape(OrightB[j],beta,beta))
+      MidHam += JK(reshape(OleftT[j],alpha,alpha),reshape(OrightT[j],beta,beta))
+      MidHam += JK(reshape(OleftB[j],alpha,alpha),reshape(OrightB[j],beta,beta))
     end
 
 
     if i > 1
       Ham += JK(HL,eye(beta))
+      LeftHam = JK(HL,eye(beta))
     end
     if i < n-1
       Ham += JK(eye(alpha),HR)
+      RightHam = JK(eye(alpha),HR)
     end
     if i == 1
       Ham += JK(JK(eye(dleft),reshape(Htwosite,4,4)),eye(beta))
+      EndHam = JK(JK(eye(dleft),reshape(Htwosite,4,4)),eye(beta))
     end
     if i == n-1
       Ham += JK(eye(alpha),JK(reshape(Htwosite,4,4),eye(dright)))
+      EndHam = JK(eye(alpha),JK(reshape(Htwosite,4,4),eye(dright)))
     end
 
 
@@ -132,40 +146,34 @@ for swp = 0:1
     bigH = reshape(Ham,alpha*beta,alpha*beta)
     bigH = 0.5 * (bigH + bigH')
     evn = eigs(bigH;nev=1, which=:SR,ritzvec=true,v0=reshape(AA,alpha*beta))
+
     @show evn[1]
     @show size(evn[2])
     gr = evn[2][:,1]
 
-    #test
-    Ham = zeros(alpha*beta,alpha*beta)
-      if i < n-1
-        Ham += JK(eye(alpha),HR)
-      end
-      if i == n-1
-        Ham += JK(eye(alpha),JK(reshape(Htwosite,4,4),eye(dright)))
-      end
-    rightE = gr'*Ham*gr
-    println("Right Energy = $rightE")
+    aa = reshape(AA,alpha*beta)
+    energy = aa' * LeftHam * aa
+    println("Left energy old = $energy")
+    energy = aa' * RightHam * aa
+    println("Right energy old = $energy")
+    energy = aa' * EndHam * aa
+    println("End energy old = $energy")
+    energy = aa' * MidHam * aa
+    println("Mid energy old = $energy")
+    energy = aa' * OldMid * aa
+    println("Prev Mid energy = $energy")
+    println(" ")
+    energy = gr' * LeftHam * gr
+    println("Left energy new = $energy")
+    energy = gr' * RightHam * gr
+    println("Right energy new = $energy")
+    energy = gr' * EndHam * gr
+    println("End energy new = $energy")
+    energy = gr' * MidHam * gr
+    println("Mid energy new = $energy")
+    println(" ")
 
-    #test
-    Ham = zeros(alpha*beta,alpha*beta)
-      if i > 1
-        Ham += JK(HL,eye(beta))
-      end
-      if i == 1
-        Ham += JK(JK(eye(dleft),reshape(Htwosite,4,4)),eye(beta))
-      end
-    leftE = gr'*Ham*gr
-    println("Left Energy = $leftE")
 
-    #test
-    Ham = zeros(alpha*beta,alpha*beta)
-    for j=1:length(OleftT)
-      Ham += JK(reshape(OleftT[j],alpha,alpha),reshape(OrightT[j],beta,beta))
-      Ham += JK(reshape(OleftB[j],alpha,alpha),reshape(OrightB[j],beta,beta))
-    end
-    centerE = gr'*Ham*gr
-    println("Center Energy = $centerE")
 
     AA = reshape(gr,dleft,2,2,2,2,dright)
     (A[i],A[i+1],trunc) = dosvd6(AA,m,toright)
